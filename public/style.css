@@ -1043,7 +1043,7 @@ dialog .secondary {
     margin-top: 23px;
   }
   .heading-actions .secondary::after {
-    content: "↻ New";
+    content: "New";
     font-size: 10px;
   }
   .battle-status {
@@ -1202,4 +1202,41 @@ dialog .secondary {
     text-align: right;
     line-height: 1.6;
   }
+}
+
+.ui-icon {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.flag-icon {
+  width: 24px;
+  height: 28px;
+}
+.footer-brand .flag-icon {
+  width: 12px;
+  height: 15px;
+}
+.unit-avatar svg {
+  display: block;
+}
+.action-button > svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+.brand-mark {
+  display: flex;
+}
+.top-right .text-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }

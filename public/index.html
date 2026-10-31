@@ -11,13 +11,23 @@
   <body>
     <header class="topbar">
       <a class="brand" href="/" aria-label="War Table home"
-        ><span class="brand-mark">⚑</span> WAR TABLE
-        <span class="edition">SKIRMISH</span></a
+        ><span class="brand-mark"
+          ><svg
+            viewBox="0 0 24 24"
+            class="ui-icon flag-icon"
+            aria-hidden="true"
+          >
+            <path d="M5 21V3h14l-5 5 5 5H5" /></svg
+        ></span>
+        WAR TABLE <span class="edition">SKIRMISH</span></a
       >
       <div class="top-right">
         <span class="save-status" id="save-status">● Saved on this device</span
         ><button id="rules-button" class="text-button">
-          ▤ &nbsp; Field guide</button
+          <svg viewBox="0 0 24 24" class="ui-icon" aria-hidden="true">
+            <path d="M5 3h14v18H5zM9 7h6M9 11h6M9 15h4" />
+          </svg>
+          &nbsp; Field guide</button
         ><button id="help-button" class="icon-button" aria-label="How to play">
           ?
         </button>
@@ -35,7 +45,10 @@
         <div class="heading-actions">
           <span class="mode-pill"><span></span> LOCAL TWO-PLAYER</span
           ><button id="reset-button" class="secondary">
-            ↻ &nbsp; New battle
+            <svg viewBox="0 0 24 24" class="ui-icon" aria-hidden="true">
+              <path d="M19 7a8 8 0 1 0 1 8M19 2v6h-6" />
+            </svg>
+            &nbsp; New battle
           </button>
         </div>
       </section>
@@ -79,7 +92,11 @@
         <section class="table-area" aria-label="Battlefield and tools">
           <div class="board-toolbar">
             <div class="board-title">
-              <span>◈</span> VERDANT CLEARING
+              <span
+                ><svg viewBox="0 0 24 24" class="ui-icon" aria-hidden="true">
+                  <path d="M12 2L22 12 12 22 2 12zM12 8l4 4-4 4-4-4z" /></svg
+              ></span>
+              VERDANT CLEARING
               <span class="board-dim">48″ × 48″</span>
             </div>
             <div class="board-controls">
@@ -89,16 +106,25 @@
                 aria-pressed="true"
                 title="Toggle 6 inch grid"
               >
-                ▦ <span>Grid</span></button
+                <svg viewBox="0 0 24 24" class="ui-icon" aria-hidden="true">
+                  <path d="M3 3h18v18H3zM9 3v18M15 3v18M3 9h18M3 15h18" />
+                </svg>
+                <span>Grid</span></button
               ><button
                 id="deploy-button"
                 class="tool"
                 aria-pressed="false"
                 title="Toggle deployment zones"
               >
-                ▥ <span>Zones</span></button
+                <svg viewBox="0 0 24 24" class="ui-icon" aria-hidden="true">
+                  <path d="M3 3h18v18H3zM8 3v18M16 3v18" />
+                </svg>
+                <span>Zones</span></button
               ><button id="measure-button" class="tool" aria-pressed="false">
-                ↗ <span>Measure</span>
+                <svg viewBox="0 0 24 24" class="ui-icon" aria-hidden="true">
+                  <path d="M4 20L20 4M12 4h8v8M6 14l4 4M10 10l4 4" />
+                </svg>
+                <span>Measure</span>
               </button>
             </div>
           </div>
@@ -174,7 +200,12 @@
                 <option>4</option>
                 <option>5</option>
                 <option>6</option></select
-              ><button class="secondary" id="roll-button">Roll dice ↗</button>
+              ><button class="secondary" id="roll-button">
+                Roll dice
+                <svg viewBox="0 0 24 24" class="ui-icon" aria-hidden="true">
+                  <path d="M4 20L20 4M12 4h8v8M6 14l4 4M10 10l4 4" />
+                </svg>
+              </button>
             </div>
             <div id="dice-results" class="dice-results" aria-live="polite">
               <span class="die placeholder">·</span
@@ -189,7 +220,7 @@
             <div class="panel-heading">
               <h2>Battle log</h2>
               <button class="text-button" id="undo-button" disabled>
-                ↶ Undo
+                ← Undo
               </button>
             </div>
             <ol id="battle-log" aria-label="Recent battle events"></ol>
@@ -197,7 +228,15 @@
         </aside>
       </div>
       <footer>
-        <span class="footer-brand">⚑ WAR TABLE</span
+        <span class="footer-brand"
+          ><svg
+            viewBox="0 0 24 24"
+            class="ui-icon flag-icon"
+            aria-hidden="true"
+          >
+            <path d="M5 21V3h14l-5 5 5 5H5" />
+          </svg>
+          WAR TABLE</span
         ><span>Built for stories, not spreadsheets.</span
         ><span
           >AoFS v3.6.0 companion

@@ -14,7 +14,12 @@ const $ = (id) => document.getElementById(id);
 const TEAMS = ["Azure Covenant", "Ember Clans"];
 const SHORT = ["Azure", "Ember"];
 const COLORS = ["#6fa6be", "#d29a7e"];
-const ICONS = { hero: "⚑", sword: "†", bow: "⌁" };
+const ICONS = Object.fromEntries(
+  ["hero", "sword", "bow"].map((kind) => [
+    kind,
+    `<svg viewBox="-16 -16 32 32" width="24" height="24" aria-hidden="true">${figure(kind)}</svg>`,
+  ]),
+);
 const STORAGE = "war-table-v1";
 let game = createGame(),
   selected = null,
@@ -96,6 +101,9 @@ function choose(id) {
   difficultUsed = false;
   measurePoints = [];
   render();
+  document
+    .querySelector(`#board [data-unit="${selected}"]`)
+    ?.focus({ preventScroll: true });
 }
 function tree(x, y, s = 1, r = 0) {
   return `<g transform="translate(${x} ${y}) rotate(${r}) scale(${s})"><ellipse cx="5" cy="13" rx="26" ry="22" fill="#354c3c" opacity=".3"/><path d="M-2 5L2 34" stroke="#646848" stroke-width="7"/><path d="M0-33L-25 6L-12 4L-29 24L27 24L14 5L24 7Z" fill="#4b6750" stroke="#425a46" stroke-width="2"/><path d="M0-33L-19 5L-7 3L-20 19L0 16Z" fill="#6d8559"/><path d="M2-22L17 6L6 3L18 17" fill="none" stroke="#779063" stroke-width="2" opacity=".5"/></g>`;
@@ -222,10 +230,10 @@ function render() {
     ? `<div class="selection-card ${u.team ? "red" : ""}"><span class="unit-avatar">${ICONS[u.kind]}</span><div><h3>${u.name}</h3><p>${TEAMS[u.team]} · ${u.shaken ? "Shaken" : u.activated ? "Activated" : "Ready"}</p></div></div>`
     : '<div class="empty-selection">Your warband awaits.<br>Select a miniature to make your move.</div>';
   const details = {
-    hold: ["◉", "Hold", "Can shoot"],
-    advance: ["↗", "Advance", "Move + shoot"],
+    hold: ["•", "Hold", "Can shoot"],
+    advance: ["→", "Advance", "Move + shoot"],
     rush: ["»", "Rush", "No shooting"],
-    charge: ["⚔", "Charge", "Move into melee"],
+    charge: [ICONS.sword, "Charge", "Move into melee"],
   };
   $("actions").innerHTML = Object.keys(ACTIONS)
     .map(
@@ -444,10 +452,7 @@ function d6() {
 $("roll-button").onclick = () => {
   const rolls = Array.from({ length: Number($("dice-count").value) }, d6);
   $("dice-results").innerHTML = rolls
-    .map(
-      (r) =>
-        `<span class="die" aria-label="${r}">${["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"][r]}</span>`,
-    )
+    .map((r) => `<span class="die" aria-label="${r}">${r}</span>`)
     .join("");
   log(`Rolled ${rolls.length}D6: ${rolls.join(", ")}.`);
   $("battle-log").innerHTML = game.log
