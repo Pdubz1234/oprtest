@@ -274,3 +274,15 @@ test("cover uses a circular base, not a square expansion at terrain corners", ()
   });
   assert.equal(lineOfSight(g, a, b).cover, true);
 });
+
+test("melee ignores cover even when the defender is inside woods", () => {
+  const g = duel("sword"),
+    [a, b] = g.units,
+    t = terrain().find((t) => t.type === "wood");
+  Object.assign(b, { x: t.x, y: t.y, shaken: true });
+  Object.assign(a, { x: t.x - BASE, y: t.y });
+  assert.equal(lineOfSight(g, a, b).cover, true);
+  const result = resolveAttack(g, a.id, b.id, "charge", rolls(6, 6, 3, 3));
+  assert.equal(result.strikes[0].cover, false);
+  assert.equal(result.strikes[0].wounds, 2);
+});

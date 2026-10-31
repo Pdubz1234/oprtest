@@ -300,6 +300,7 @@ function render() {
     .slice(0, 8)
     .map((s) => `<li>${esc(s)}</li>`)
     .join("");
+  renderCombat();
   $("board-hint").textContent = game.ended
     ? `Final control: Azure ${score(game, 0)} · Ember ${score(game, 1)}. ${score(game, 0) === score(game, 1) ? "The battle is a draw." : `${SHORT[score(game, 0) > score(game, 1) ? 0 : 1]} wins!`}`
     : aiming
@@ -311,7 +312,6 @@ function render() {
           : available
             ? `${u.name} selected · ${u.shaken ? "End activation to recover." : `Choose an action, then click to move. Arrow keys move 1″.`}`
             : `Select an available ${SHORT[game.player]} miniature to begin your activation.`;
-  renderCombat();
   drawBoard();
   save();
 }
