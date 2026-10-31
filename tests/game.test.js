@@ -187,11 +187,14 @@ test("weapon distance is measured base-edge to base-edge with inclusive boundary
   const g = createGame(),
     bow = g.units[3],
     enemy = g.units[6];
-  enemy.x = bow.x + 24 + BASE;
-  enemy.y = bow.y;
+  bow.x = 3;
+  bow.y = 1;
+  enemy.x = 3;
+  enemy.y = 1 + 24 + BASE;
+  g.units = [bow, enemy];
   assert.equal(weaponProfile(bow).range, 24);
   assert.ok(unitRanges(g, bow, "advance").targets.includes(enemy.id));
-  enemy.x += 0.01;
+  enemy.y += 0.01;
   assert.ok(!unitRanges(g, bow, "advance").targets.includes(enemy.id));
   bow.weaponRange = 36;
   assert.ok(unitRanges(g, bow, "hold").targets.includes(enemy.id));
@@ -203,8 +206,9 @@ test("weapon distance is measured base-edge to base-edge with inclusive boundary
 test("shooting requires Hold or Advance and an available unshaken bow unit", () => {
   const g = createGame(),
     bow = g.units[3];
-  for (const action of ["rush", "charge", "invalid"])
+  for (const action of ["rush", "invalid"])
     assert.equal(unitRanges(g, bow, action).weaponAvailable, false);
+  assert.equal(unitRanges(g, bow, "charge").weapon.ranged, false);
   assert.equal(unitRanges(g, bow, "hold").weaponAvailable, true);
   for (const key of ["shaken", "activated"]) {
     bow[key] = true;

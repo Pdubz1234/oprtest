@@ -13,6 +13,12 @@ import {
   movementBudget,
   unitRanges,
   weaponProfile,
+  combatProfile,
+  woundsLeft,
+  lineOfSight,
+  attackCheck,
+  resolveAttack,
+  chargeDestination,
 } from "./game.js";
 import {
   defaultCamera,
@@ -46,6 +52,8 @@ let camera = defaultCamera(),
   panning = false,
   drag = null,
   suppressClick = false;
+let targetId = null,
+  aiming = false;
 try {
   const saved = JSON.parse(localStorage.getItem(STORAGE));
   if (
@@ -109,6 +117,8 @@ function choose(id) {
     return;
   }
   selected = id;
+  targetId = null;
+  aiming = false;
   action = "advance";
   spent = 0;
   difficultUsed = false;
@@ -197,10 +207,15 @@ function drawBoard() {
       art += `<path d="M${a.x * 20} ${a.y * 20}L${b.x * 20} ${b.y * 20}" stroke="#f2efc7" stroke-width="2" stroke-dasharray="8 5"/><circle cx="${b.x * 20}" cy="${b.y * 20}" r="5" fill="#f2efc7"/><text x="${(a.x + b.x) * 10}" y="${(a.y + b.y) * 10 - 12}" text-anchor="middle" fill="#fffce0" stroke="#40523a" stroke-width="3" paint-order="stroke" font-size="18">${distance(a, b).toFixed(1)}″</text>`;
     }
   }
+  const target = game.units.find((m) => m.id === targetId && !m.removed);
+  if (u && !u.removed && target && !measuring) {
+    const sight = lineOfSight(game, u, target);
+    art += `<path class="sight-line" d="M${u.x * 20} ${u.y * 20}L${target.x * 20} ${target.y * 20}" stroke="${sight.clear ? "#f9dc91" : "#f4897c"}" stroke-width="3" stroke-dasharray="9 5" pointer-events="none"><title>${esc(sight.reason)}</title></path>`;
+  }
   for (const m of game.units.filter((m) => !m.removed)) {
     const isSelected = m.id === selected,
       r = BASE * 10;
-    art += `<g class="miniature" data-unit="${m.id}" role="button" tabindex="0" aria-label="${esc(SHORT[m.team] + " " + m.name + (m.activated ? ", activated" : "") + (m.shaken ? ", shaken" : ""))}" transform="translate(${m.x * 20} ${m.y * 20})" style="color:${m.team ? "#ffe0c0" : "#d8f0ef"};opacity:${m.activated ? 0.6 : 1}"><title>${esc(SHORT[m.team] + " " + m.name)} · 32 mm base</title>${ranges?.targets.includes(m.id) ? `<circle class="range-target" r="${r + 10}" fill="none" stroke="#ffd393" stroke-width="3"><title>Within weapon distance; resolve line of sight and combat manually</title></circle>` : ""}${isSelected ? `<circle r="${r + 6}" fill="none" stroke="#f3ebc3" stroke-width="2"/><path d="M-4-25L0-20L4-25" fill="#f3ebc3"/>` : ""}<circle class="base" r="${r}" fill="${m.team ? "#785345" : "#3d6375"}" stroke="${COLORS[m.team]}" stroke-width="2" filter="url(#shadow)"/>${figure(m.kind)}${m.shaken ? '<text x="12" y="-11" fill="#ffe0a1" font-weight="bold" font-size="17">!</text>' : ""}${m.activated ? '<text x="12" y="-11" fill="#eaf2d5" font-size="16">✓</text>' : ""}</g>`;
+    art += `<g class="miniature" data-unit="${m.id}" role="button" tabindex="0" aria-label="${esc(SHORT[m.team] + " " + m.name + (m.activated ? ", activated" : "") + (m.shaken ? ", shaken" : ""))}" transform="translate(${m.x * 20} ${m.y * 20})" style="color:${m.team ? "#ffe0c0" : "#d8f0ef"};opacity:${m.activated ? 0.6 : 1}"><title>${esc(SHORT[m.team] + " " + m.name)} · 32 mm base</title>${ranges?.targets.includes(m.id) ? `<circle class="range-target" r="${r + 10}" fill="none" stroke="#ffd393" stroke-width="3"><title>Legal attack target: range and line of sight checked</title></circle>` : ""}${isSelected ? `<circle r="${r + 6}" fill="none" stroke="#f3ebc3" stroke-width="2"/><path d="M-4-25L0-20L4-25" fill="#f3ebc3"/>` : ""}<circle class="base" r="${r}" fill="${m.team ? "#785345" : "#3d6375"}" stroke="${COLORS[m.team]}" stroke-width="2" filter="url(#shadow)"/>${figure(m.kind)}${m.wounds ? `<text y="32" text-anchor="middle" fill="#fff4d9" stroke="#40523a" stroke-width="2" paint-order="stroke" font-size="14">${woundsLeft(m)} HP</text>` : ""}${m.shaken ? '<text x="12" y="-11" fill="#ffe0a1" font-weight="bold" font-size="17">!</text>' : ""}${m.activated ? '<text x="12" y="-11" fill="#eaf2d5" font-size="16">✓</text>' : ""}</g>`;
   }
   $("board").innerHTML =
     `<g id="camera"><clipPath id="battlefield-clip"><rect width="960" height="960"/></clipPath><g clip-path="url(#battlefield-clip)">${art}</g></g>`;
@@ -226,7 +241,7 @@ function render() {
           .filter((u) => u.team === team)
           .map(
             (u) =>
-              `<button class="unit-row ${u.id === selected ? "selected" : ""} ${u.activated ? "used" : ""} ${u.removed ? "removed" : ""}" data-unit="${u.id}" ${u.removed ? "disabled" : ""} aria-pressed="${u.id === selected}" aria-label="${SHORT[team]} ${u.name}${u.activated ? ", activated" : ""}${u.shaken ? ", shaken" : ""}"><span class="unit-avatar">${ICONS[u.kind]}</span><span>${u.name}</span><span class="unit-state ${!u.shaken && !u.activated ? "ready" : ""}">${u.shaken ? "!" : u.activated ? "✓" : ""}</span></button>`,
+              `<button class="unit-row ${u.id === selected ? "selected" : ""} ${u.activated ? "used" : ""} ${u.removed ? "removed" : ""}" data-unit="${u.id}" ${u.removed ? "disabled" : ""} aria-pressed="${u.id === selected}" aria-label="${SHORT[team]} ${u.name}${u.activated ? ", activated" : ""}${u.shaken ? ", shaken" : ""}"><span class="unit-avatar">${ICONS[u.kind]}</span><span>${u.name}${u.wounds ? ` · ${woundsLeft(u)} HP` : ""}</span><span class="unit-state ${!u.shaken && !u.activated ? "ready" : ""}">${u.shaken ? "!" : u.activated ? "✓" : ""}</span></button>`,
           )
           .join("")}</section>`,
     )
@@ -262,7 +277,7 @@ function render() {
     `${limit ? Math.min(100, (spent / limit) * 100) : 0}%`;
   const ranges = unitRanges(game, u, action, spent, difficultUsed);
   $("range-readout").textContent = ranges
-    ? `Movement upper bound: ${ranges.movement.toFixed(1)}″ remaining · ${ranges.weapon.name}: ${ranges.weapon.range || "base contact"}${ranges.weapon.range ? "″" : ""}${ranges.weaponAvailable ? "" : " (unavailable for this activation/action)"}. ${ranges.targets.length} distance-qualified targets for this action. Distance only; check line of sight and resolve combat manually.`
+    ? `Movement upper bound: ${ranges.movement.toFixed(1)}″ remaining · ${ranges.weapon.name}: ${ranges.weapon.range || "base contact"}${ranges.weapon.range ? "″" : ""}${ranges.weaponAvailable ? "" : " (unavailable for this activation/action)"}. ${ranges.targets.length} legal attack targets (range + line of sight).`
     : "Select a unit to see movement and weapon ranges.";
   $("weapon-range-input").disabled =
     !u || u.removed || u.kind !== "bow" || game.ended;
@@ -271,8 +286,8 @@ function render() {
   $("action-help").textContent = u?.shaken
     ? "Recovery: end this activation without moving to clear Shaken."
     : action === "charge"
-      ? "Move up to 12″ toward an enemy. Resolve final base contact and melee manually."
-      : "Click a destination on the board. Combat is resolved manually.";
+      ? "Choose an enemy, move to contact, then resolve melee. Surviving unshaken defenders strike back."
+      : "Click to move, then select a combat target. Resolve attack rolls dice and ends the activation.";
   $("finish-button").disabled = !available;
   $("finish-button").innerHTML = u?.shaken
     ? "Recover & end activation <span>→</span>"
@@ -287,16 +302,132 @@ function render() {
     .join("");
   $("board-hint").textContent = game.ended
     ? `Final control: Azure ${score(game, 0)} · Ember ${score(game, 1)}. ${score(game, 0) === score(game, 1) ? "The battle is a draw." : `${SHORT[score(game, 0) > score(game, 1) ? 0 : 1]} wins!`}`
-    : measuring
-      ? "Ruler active: click two points to measure center-to-center distance."
-      : roundComplete(game)
-        ? "All miniatures have activated. Advance the round to resolve objectives."
-        : available
-          ? `${u.name} selected · ${u.shaken ? "End activation to recover." : `Choose an action, then click to move. Arrow keys move 1″.`}`
-          : `Select an available ${SHORT[game.player]} miniature to begin your activation.`;
+    : aiming
+      ? "Targeting mode: click an enemy to inspect sight and combat eligibility. Resolve in the Combat panel."
+      : measuring
+        ? "Ruler active: click two points to measure center-to-center distance."
+        : roundComplete(game)
+          ? "All miniatures have activated. Advance the round to resolve objectives."
+          : available
+            ? `${u.name} selected · ${u.shaken ? "End activation to recover." : `Choose an action, then click to move. Arrow keys move 1″.`}`
+            : `Select an available ${SHORT[game.player]} miniature to begin your activation.`;
+  renderCombat();
   drawBoard();
   save();
 }
+function renderCombat() {
+  const u = unit();
+  const enemies =
+    u && !u.removed
+      ? game.units.filter((v) => v.team !== u.team && !v.removed)
+      : [];
+  if (!enemies.some((v) => v.id === targetId)) {
+    const legal = enemies.find(
+      (v) => !attackCheck(game, u.id, v.id, action).error,
+    );
+    targetId = (legal || enemies[0])?.id ?? null;
+  }
+  const target = enemies.find((v) => v.id === targetId);
+  $("combat-target").innerHTML =
+    '<option value="">Select enemy</option>' +
+    enemies
+      .map(
+        (v) =>
+          `<option value="${v.id}" ${v.id === targetId ? "selected" : ""}>${esc(SHORT[v.team] + " " + v.name)} · ${woundsLeft(v)} HP</option>`,
+      )
+      .join("");
+  $("combat-target").disabled = !enemies.length;
+  $("aim-button").disabled = !u || u.removed || !enemies.length;
+  if (!u || u.removed) aiming = false;
+  $("aim-button").setAttribute("aria-pressed", aiming);
+  $("aim-button").textContent = aiming
+    ? "Targeting on: pick enemy on map"
+    : "Pick target on map";
+  const profile = u ? combatProfile(u) : null;
+  $("combat-profile").textContent = profile
+    ? `Demo profile · Q${profile.quality}+ · D${profile.defense}+ · ${profile.meleeAttacks} melee / ${profile.rangedAttacks} bow attacks · ${woundsLeft(u)}/${profile.toughness} HP. Repeated melee this round: ${u.fought ? "fatigued (hits on 6)" : "fresh"}.`
+    : "Select a unit. Profiles are demo values, not official army data.";
+  const check = attackCheck(game, u?.id, targetId, action);
+  const sight = u && target ? lineOfSight(game, u, target) : null;
+  $("sight-status").textContent = sight
+    ? `${Math.max(0, distance(u, target) - BASE).toFixed(1)}″ base-edge distance · ${sight.reason} Target: Q${combatProfile(target).quality}+ / D${combatProfile(target).defense}+, ${woundsLeft(target)} HP.`
+    : "Select an enemy to inspect line of sight.";
+  $("attack-status").textContent =
+    check.error ||
+    `Ready: ${check.melee ? "melee with possible retaliation" : "shooting"}. Resolving ends this activation.`;
+  $("attack-button").disabled = Boolean(check.error);
+  $("attack-button").textContent = check.melee
+    ? "Resolve melee & end activation"
+    : "Shoot & end activation";
+  let chargeError = true;
+  if (canActivate(u) && !u.shaken && action === "charge" && target) {
+    const point = chargeDestination(u, target);
+    const move = moveResult(game, u.id, point, action, spent, difficultUsed);
+    chargeError = Boolean(move.error) || move.length < 0.01;
+    if (move.error)
+      $("attack-status").textContent += ` Straight charge path: ${move.error}`;
+  }
+  $("contact-button").disabled = chargeError;
+  $("combat-report").innerHTML = game.lastCombat
+    ? `<h3>Last combat · round ${game.lastCombat.round}</h3>` +
+      game.lastCombat.strikes
+        .map((s) => {
+          const attacker = game.units.find((v) => v.id === s.attacker),
+            defender = game.units.find((v) => v.id === s.target);
+          return `<p>${esc(SHORT[attacker.team] + " " + attacker.name)} → ${esc(SHORT[defender.team] + " " + defender.name)}<br>Hit dice [${s.attacks.join(", ")}] at ${s.quality}+; saves [${s.saves.join(", ") || "none"}] at ${s.defense}+${s.cover ? " (+1 cover)" : ""}. <strong>${s.wounds} wound(s)${s.removed ? " · removed" : ""}</strong>.</p>`;
+        })
+        .join("")
+    : "No combat resolved yet. Natural 1 fails; natural 6 succeeds. Cover adds +1 to shooting saves. Demo damage removes units at 0 HP; official injury/morale rules remain manual.";
+}
+function pickMiniature(id) {
+  const candidate = game.units.find((v) => v.id === id);
+  if (
+    aiming &&
+    unit() &&
+    candidate &&
+    candidate.team !== unit().team &&
+    !candidate.removed
+  ) {
+    targetId = id;
+    render();
+  } else choose(id);
+}
+$("combat-target").onchange = () => {
+  targetId = $("combat-target").value;
+  render();
+};
+$("aim-button").onclick = () => {
+  aiming = !aiming;
+  render();
+};
+$("contact-button").onclick = () => {
+  const target = game.units.find((v) => v.id === targetId && !v.removed);
+  if (!unit() || !target || action !== "charge") return;
+  moveTo(chargeDestination(unit(), target));
+};
+$("attack-button").onclick = () => {
+  const check = attackCheck(game, selected, targetId, action);
+  if (check.error) {
+    toast(check.error);
+    return;
+  }
+  snapshot();
+  const result = resolveAttack(game, selected, targetId, action, d6);
+  for (const strike of result.strikes) {
+    const attacker = game.units.find((v) => v.id === strike.attacker),
+      target = game.units.find((v) => v.id === strike.target);
+    log(
+      `${SHORT[attacker.team]} ${attacker.name} → ${SHORT[target.team]} ${target.name}: hits [${strike.attacks.join(",")}], saves [${strike.saves.join(",") || "none"}], ${strike.wounds} wound(s)${strike.removed ? "; removed" : ""}.`,
+    );
+  }
+  spent = 0;
+  difficultUsed = false;
+  aiming = false;
+  render();
+  toast(
+    "Combat resolved. Activation ended; Undo restores the entire exchange.",
+  );
+};
 function moveTo(target) {
   const u = unit();
   if (!u) {
@@ -429,7 +560,7 @@ $("weapon-range-input").onchange = () => {
 };
 $("rosters").addEventListener("click", (event) => {
   const b = event.target.closest("[data-unit]");
-  if (b) choose(b.dataset.unit);
+  if (b) pickMiniature(b.dataset.unit);
 });
 $("board").addEventListener("click", (event) => {
   if (panning || suppressClick) {
@@ -439,7 +570,7 @@ $("board").addEventListener("click", (event) => {
   if (!measuring) {
     const m = event.target.closest("[data-unit]");
     if (m) {
-      choose(m.dataset.unit);
+      pickMiniature(m.dataset.unit);
       return;
     }
   }
@@ -460,13 +591,13 @@ $("board").addEventListener("click", (event) => {
       );
     return;
   }
-  moveTo(p);
+  if (!aiming) moveTo(p);
 });
 $("board").addEventListener("keydown", (event) => {
   const target = event.target.closest("[data-unit]");
   if ((event.key === "Enter" || event.key === " ") && target) {
     event.preventDefault();
-    choose(target.dataset.unit);
+    pickMiniature(target.dataset.unit);
     document.querySelector(`#board [data-unit="${selected}"]`)?.focus();
     return;
   }
@@ -476,7 +607,7 @@ $("board").addEventListener("keydown", (event) => {
     ArrowLeft: [-1, 0],
     ArrowRight: [1, 0],
   }[event.key];
-  if (delta && unit()) {
+  if (delta && unit() && !aiming) {
     event.preventDefault();
     const u = unit();
     const origin = viewToWorld({ x: 480, y: 480 }, camera);
@@ -617,11 +748,11 @@ $("guide").addEventListener("click", (e) => {
 });
 $("help-button").onclick = () =>
   openGuide(
-    `<h2>Your table, ready to play.</h2><ol><li>Azure starts. Select one of its miniatures in the roster or on the board.</li><li>Choose Hold, Advance, Rush or Charge, then click a destination. You may make several shorter moves within the action’s total range. On keyboard, focus a board miniature, press Enter to select, then use arrow keys for 1″ steps.</li><li>Resolve attacks and special rules manually using your army lists and the dice tray. Mark Shaken or remove casualties with the activation panel.</li><li>End activation, then pass the device to the other player. When all miniatures have activated, advance the round.</li><li>After four rounds, the side controlling the most objectives wins.</li></ol><p>Grid squares are 6″. Use Zones to view the 12″ deployment areas, or Measure to check center-to-center distances. Undo reverses board changes; New battle clears the board. Progress saves in this browser only—there is no online multiplayer.</p><h3>Camera and ranges</h3><p>Use +/− or the mouse wheel to zoom, rotate in 45° steps, and enable Pan to drag the view with mouse or touch. Reset view fits the whole board. Arrow keys move in the screen direction after rotation. Green is remaining movement (an upper bound, not a legal-path guarantee); amber is weapon distance to target centers, including both 32 mm bases. Amber target rings check distance only, not line of sight. Bows default to a demo 24″ range editable in the activation panel; melee requires base contact. Rush/Charge disable shooting; Shaken and unavailable units cannot attack. Attacks remain manual.</p><h3>Prototype boundaries</h3><p>Each demo miniature is treated as its own unit. These are illustrative rosters, not official or points-balanced army lists. Deployment is pre-set. Line of sight, cover bonuses, combat, wounds, morale tests, special rules and final charge base contact are manual. Ruins and rocks are treated as impassable sight blockers; woodland and brush count as cover and difficult terrain. This is a tabletop companion, not a complete rules engine.</p>`,
+    `<h2>Your table, ready to play.</h2><ol><li>Azure starts. Select one of its miniatures in the roster or on the board.</li><li>Choose Hold, Advance, Rush or Charge, then click a destination. You may make several shorter moves within the action’s total range. On keyboard, focus a board miniature, press Enter to select, then use arrow keys for 1″ steps.</li><li>Select an enemy in the combat panel or enable Pick target on map. Inspect sight/range, then resolve the attack; dice, saves, wounds and removal are automatic and the activation ends. Special rules remain manual. Mark Shaken or remove casualties with the activation panel.</li><li>End activation, then pass the device to the other player. When all miniatures have activated, advance the round.</li><li>After four rounds, the side controlling the most objectives wins.</li></ol><p>Grid squares are 6″. Use Zones to view the 12″ deployment areas, or Measure to check center-to-center distances. Undo reverses board changes; New battle clears the board. Progress saves in this browser only—there is no online multiplayer.</p><h3>Camera and ranges</h3><p>Use +/− or the mouse wheel to zoom, rotate in 45° steps, and enable Pan to drag the view with mouse or touch. Reset view fits the whole board. Arrow keys move in the screen direction after rotation. Green is remaining movement (an upper bound, not a legal-path guarantee); amber is weapon distance to target centers, including both 32 mm bases. Amber target rings check range, line of sight and action eligibility. Bows default to a demo 24″ range editable in the activation panel; melee requires base contact. Rush/Charge disable shooting; Shaken and unavailable units cannot attack. Use the combat panel to resolve attacks with demo profiles.</p><h3>Prototype boundaries</h3><p>Each demo miniature is treated as its own unit. These are illustrative rosters, not official or points-balanced army lists. Deployment is pre-set. Demo combat uses Q3+/3 HP captains, D3+ guardians, and Q4+/D4+/1 HP other models. Captains roll 3 melee dice, blades/guardians 2, rangers 1 melee or bow die. Sight is a 2D center ray: rock/ruin rectangles and intervening bases block; woods/brush overlapping the target base give +1 shooting Defense. Woods do not block sight. Charge uses the melee weapon, including rangers; Move to contact checks a straight legal path. A surviving unshaken defender retaliates; repeated melee hits only on 6 until next round. Units in contact cannot move or shoot. Damage removes at 0 HP rather than using official injury rolls. Morale, routs, disengagement, spells, special rules and multi-model units remain manual. Ruins and rocks are treated as impassable sight blockers; woodland and brush count as cover and difficult terrain. This is a tabletop companion, not a complete rules engine.</p>`,
   );
 $("rules-button").onclick = () =>
   openGuide(
-    `<h2>A skirmish in four rounds.</h2><p>Quick reference based on the supplied <strong>Age of Fantasy: Skirmish Core Rules v3.6.0</strong>. Refer to your PDF for complete rules.</p><h3>Prepare the battlefield</h3><p>A 48″ square with 20+ terrain pieces. Deploy within 12″ of opposite edges. Use equal-point armies; this table starts with demo rosters and three pre-placed objectives, 12″ apart and outside deployment zones.</p><h3>Activate, then alternate</h3><p>Hold: stay and shoot. Advance: move 6″ and shoot. Rush: move 12″ without shooting. Charge: move up to 12″ into melee. Difficult terrain caps total movement at 6″. The first side to finish activating starts the next round.</p><h3>Roll and resolve manually</h3><p>Quality tests succeed at the model’s Quality or higher. Defense blocks successful hits; failed blocks cause wounds. Natural 6 always succeeds; natural 1 always fails. Cover gives +1 Defense against shooting. See the PDF for melee, fatigue, morale and special rules.</p><h3>Hold the crossing</h3><p>At round end, an unshaken unit within 3″ of a marker seizes it if no enemy is in range. Contested markers become neutral; otherwise control persists. Most markers after round four wins. The table measures objective range from the base edge.</p><p>Unofficial fan-made companion. Original rules © OPR Games, created by Gaetano Ferrara. No affiliation or endorsement.</p>`,
+    `<h2>A skirmish in four rounds.</h2><p>Quick reference based on the supplied <strong>Age of Fantasy: Skirmish Core Rules v3.6.0</strong>. Refer to your PDF for complete rules.</p><h3>Prepare the battlefield</h3><p>A 48″ square with 20+ terrain pieces. Deploy within 12″ of opposite edges. Use equal-point armies; this table starts with demo rosters and three pre-placed objectives, 12″ apart and outside deployment zones.</p><h3>Activate, then alternate</h3><p>Hold: stay and shoot. Advance: move 6″ and shoot. Rush: move 12″ without shooting. Charge: move up to 12″ into melee. Difficult terrain caps total movement at 6″. The first side to finish activating starts the next round.</p><h3>Demo combat and official rules</h3><p>Quality tests succeed at the model’s Quality or higher. Defense blocks successful hits; failed blocks cause wounds. Natural 6 always succeeds; natural 1 always fails. Cover gives +1 Defense against shooting. The combat panel automates a simplified demo exchange, including retaliation and fatigue, not the complete official rules. Demo HP replaces official injury rolls. See How to play for exact prototype behavior and use the PDF for injury, morale and special rules.</p><h3>Hold the crossing</h3><p>At round end, an unshaken unit within 3″ of a marker seizes it if no enemy is in range. Contested markers become neutral; otherwise control persists. Most markers after round four wins. The table measures objective range from the base edge.</p><p>Unofficial fan-made companion. Original rules © OPR Games, created by Gaetano Ferrara. No affiliation or endorsement.</p>`,
   );
 $("reset-button").onclick = () => {
   openGuide(

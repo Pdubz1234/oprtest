@@ -1305,3 +1305,47 @@ dialog .secondary {
   line-height: 1.6;
   margin: 10px 0;
 }
+
+.combat-panel {
+  padding: 20px;
+  min-width: 0;
+}
+.combat-panel p,
+.combat-report {
+  font-size: 11px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.combat-panel label {
+  font-size: 11px;
+  display: block;
+  margin: 12px 0 5px;
+}
+.combat-panel select {
+  width: 100%;
+  min-width: 0;
+  padding: 8px;
+  color: #3e5138;
+  background: #fffef7;
+  border: 1px solid #ccd5bf;
+  border-radius: 4px;
+}
+.combat-panel button {
+  width: 100%;
+  margin-top: 8px;
+  white-space: normal;
+  line-height: 1.5;
+}
+.combat-report {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid #ccd5bf;
+}
+.combat-report h3 {
+  font-size: 12px;
+}
+@media (max-width: 900px) {
+  .combat-panel {
+    grid-column: 1/-1;
+  }
+}

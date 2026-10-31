@@ -182,8 +182,7 @@
             >
           </div>
           <p class="range-legend">
-            <span>Green: movement left</span
-            ><span>Amber: weapon distance</span>
+            <span>Green: movement left</span><span>Amber: weapon distance</span>
           </p>
           <div class="board-hint" id="board-hint">
             Select an Azure miniature to begin your activation.
@@ -220,7 +219,7 @@
             </div>
             <div class="movement-track"><span id="movement-fill"></span></div>
             <p class="muted inspector-help" id="action-help">
-              Click a destination on the board. Combat is resolved manually.
+              Move, inspect a target, then resolve combat.
             </p>
             <button id="finish-button" class="primary" disabled>
               End activation <span>→</span>
@@ -232,6 +231,36 @@
                 Remove
               </button>
             </div>
+          </section>
+          <section
+            class="panel combat-panel"
+            aria-label="Combat and line of sight"
+          >
+            <div class="panel-heading">
+              <h2>Combat</h2>
+              <span class="small-label">DEMO RULES</span>
+            </div>
+            <p id="combat-profile" class="muted"></p>
+            <label for="combat-target">Enemy target</label>
+            <select id="combat-target">
+              <option value="">Select enemy</option>
+            </select>
+            <button id="aim-button" class="secondary" aria-pressed="false">
+              Pick target on map
+            </button>
+            <p id="sight-status" role="status"></p>
+            <p id="attack-status" class="muted" role="status"></p>
+            <button id="contact-button" class="secondary" disabled>
+              Move to contact (Charge)
+            </button>
+            <button id="attack-button" class="primary" disabled>
+              Resolve attack & end activation
+            </button>
+            <div
+              id="combat-report"
+              class="combat-report"
+              aria-live="polite"
+            ></div>
           </section>
           <section class="panel dice-panel">
             <div class="panel-heading">
