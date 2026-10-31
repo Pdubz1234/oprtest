@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#171e1b" />
+    <title>War Table — The Verdant Crossing</title>
+    <link rel="stylesheet" href="/style.css" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="War Table home"
+        ><span class="brand-mark"
+          ><svg
+            viewBox="0 0 24 24"
+            class="ui-icon flag-icon"
+            aria-hidden="true"
+          >
+            <path d="M5 21V3h14l-5 5 5 5H5" /></svg
+        ></span>
+        WAR TABLE <span class="edition">SKIRMISH</span></a
+      >
+      <div class="top-right">
+        <span class="save-status" id="save-status">● Saved on this device</span
+        ><button id="rules-button" class="text-button">
+          <svg viewBox="0 0 24 24" class="ui-icon" aria-hidden="true">
+            <path d="M5 3h14v18H5zM9 7h6M9 11h6M9 15h4" />
+          </svg>
+          &nbsp; Field guide</button
+        ><button id="help-button" class="icon-button" aria-label="How to play">
+          ?
+        </button>
+      </div>
+    </header>
+    <main>
+      <section class="heading">
+        <div>
+          <div class="eyebrow">
+            <span class="tiny-line"></span> YOUR NEXT STORY STARTS HERE
+          </div>
+          <h1>The Verdant Crossing<span class="title-dot">.</span></h1>
+          <p>A quiet clearing. Two warbands. One battlefield.</p>
+        </div>
+        <div class="heading-actions">
+          <span class="mode-pill"><span></span> LOCAL TWO-PLAYER</span
+          ><button id="reset-button" class="secondary">
+            <svg viewBox="0 0 24 24" class="ui-icon" aria-hidden="true">
+              <path d="M19 7a8 8 0 1 0 1 8M19 2v6h-6" />
+            </svg>
+            &nbsp; New battle
+          </button>
+        </div>
+      </section>
+      <section class="battle-status" aria-label="Battle status">
+        <div class="status-main">
+          <span class="live-dot"></span
+          ><strong id="turn-label">Azure’s turn</strong
+          ><span class="status-separator"></span
+          ><span id="phase-label">Alternating activations</span>
+        </div>
+        <div class="round-progress" id="round-progress"></div>
+        <button id="next-round" class="text-button" disabled>
+          Next round →
+        </button>
+      </section>
+      <div class="workspace">
+        <aside class="warbands panel">
+          <div class="panel-heading">
+            <h2>Warbands</h2>
+            <span class="small-label">DEMO ROSTERS</span>
+          </div>
+          <div id="rosters"></div>
+          <div class="roster-note">
+            <span>ⓘ</span>
+            <p>
+              Each icon is one miniature on a <strong>32 mm base</strong>.
+              Sample warbands, not points-balanced armies.
+            </p>
+          </div>
+          <div class="objectives-summary">
+            <div class="panel-heading">
+              <h2>Objectives</h2>
+              <span class="small-label">3 MARKERS</span>
+            </div>
+            <div id="objective-list"></div>
+            <p class="muted">
+              Seize within 3″ at round end. Control persists until contested.
+            </p>
+          </div>
+        </aside>
+        <section class="table-area" aria-label="Battlefield and tools">
+          <div class="board-toolbar">
+            <div class="board-title">
+              <span
+                ><svg viewBox="0 0 24 24" class="ui-icon" aria-hidden="true">
+                  <path d="M12 2L22 12 12 22 2 12zM12 8l4 4-4 4-4-4z" /></svg
+              ></span>
+              VERDANT CLEARING
+              <span class="board-dim">48″ × 48″</span>
+            </div>
+            <div class="board-controls">
+              <button
+                id="grid-button"
+                class="tool active"
+                aria-pressed="true"
+                title="Toggle 6 inch grid"
+              >
+                <svg viewBox="0 0 24 24" class="ui-icon" aria-hidden="true">
+                  <path d="M3 3h18v18H3zM9 3v18M15 3v18M3 9h18M3 15h18" />
+                </svg>
+                <span>Grid</span></button
+              ><button
+                id="deploy-button"
+                class="tool"
+                aria-pressed="false"
+                title="Toggle deployment zones"
+              >
+                <svg viewBox="0 0 24 24" class="ui-icon" aria-hidden="true">
+                  <path d="M3 3h18v18H3zM8 3v18M16 3v18" />
+                </svg>
+                <span>Zones</span></button
+              ><button id="measure-button" class="tool" aria-pressed="false">
+                <svg viewBox="0 0 24 24" class="ui-icon" aria-hidden="true">
+                  <path d="M4 20L20 4M12 4h8v8M6 14l4 4M10 10l4 4" />
+                </svg>
+                <span>Measure</span>
+              </button>
+            </div>
+          </div>
+          <div
+            class="camera-controls"
+            role="group"
+            aria-label="Map view controls"
+          >
+            <button id="zoom-out" class="tool" aria-label="Zoom out">−</button>
+            <output id="view-status" aria-live="polite">100% · 0°</output>
+            <button id="zoom-in" class="tool" aria-label="Zoom in">+</button>
+            <button
+              id="rotate-left"
+              class="tool"
+              aria-label="Rotate map left 45 degrees"
+            >
+              Left 45°
+            </button>
+            <button
+              id="rotate-right"
+              class="tool"
+              aria-label="Rotate map right 45 degrees"
+            >
+              Right 45°
+            </button>
+            <button id="pan-button" class="tool" aria-pressed="false">
+              Pan view
+            </button>
+            <button id="reset-view" class="tool">Reset view</button>
+          </div>
+          <div class="board-frame">
+            <div class="axis-top">
+              <span>0″</span><span>12″</span><span>24″</span><span>36″</span
+              ><span>48″</span>
+            </div>
+            <div class="axis-side">
+              <span>0″</span><span>12″</span><span>24″</span><span>36″</span
+              ><span>48″</span>
+            </div>
+            <svg
+              id="board"
+              viewBox="0 0 960 960"
+              aria-label="48 by 48 inch battlefield. Select a miniature then click a destination. Use arrow keys to move selected miniature one inch."
+              role="group"
+            ></svg
+            ><span class="board-corner">N ↑</span>
+          </div>
+          <div class="board-caption">
+            <span
+              ><i class="legend-dot wood"></i> Cover / difficult
+              <i class="legend-dot stone"></i> Sight blocker</span
+            ><span
+              >1 grid square = 6″ <span class="caption-separator">·</span> 20
+              terrain pieces</span
+            >
+          </div>
+          <p class="range-legend">
+            <span>Green: movement left</span><span>Amber: weapon distance</span>
+          </p>
+          <div class="board-hint" id="board-hint">
+            Select an Azure miniature to begin your activation.
+          </div>
+        </section>
+        <aside class="right-column">
+          <section class="panel inspector">
+            <div class="panel-heading">
+              <h2>Activation</h2>
+              <span class="small-label" id="selection-tag">SELECT A UNIT</span>
+            </div>
+            <div id="selected-info"></div>
+            <div class="range-settings">
+              <label for="weapon-range-input">Demo bow range (inches)</label>
+              <input
+                id="weapon-range-input"
+                type="number"
+                min="1"
+                max="48"
+                step="0.5"
+                disabled
+              />
+            </div>
+            <p
+              class="muted range-readout"
+              id="range-readout"
+              aria-live="polite"
+            ></p>
+            <div class="action-label">CHOOSE AN ACTION</div>
+            <div class="action-grid" id="actions"></div>
+            <div class="movement-readout">
+              <span>Movement used</span
+              ><strong id="movement-used">0″ / 6″</strong>
+            </div>
+            <div class="movement-track"><span id="movement-fill"></span></div>
+            <p class="muted inspector-help" id="action-help">
+              Move, inspect a target, then resolve combat.
+            </p>
+            <button id="finish-button" class="primary" disabled>
+              End activation <span>→</span>
+            </button>
+            <div class="unit-tools">
+              <button id="shaken-button" class="text-button" disabled>
+                Mark shaken</button
+              ><button id="remove-button" class="text-button" disabled>
+                Remove
+              </button>
+            </div>
+          </section>
+          <section
+            class="panel combat-panel"
+            aria-label="Combat and line of sight"
+          >
+            <div class="panel-heading">
+              <h2>Combat</h2>
+              <span class="small-label">DEMO RULES</span>
+            </div>
+            <p id="combat-profile" class="muted"></p>
+            <label for="combat-target">Enemy target</label>
+            <select id="combat-target">
+              <option value="">Select enemy</option>
+            </select>
+            <button id="aim-button" class="secondary" aria-pressed="false">
+              Pick target on map
+            </button>
+            <p id="sight-status" role="status"></p>
+            <p id="attack-status" class="muted" role="status"></p>
+            <button id="contact-button" class="secondary" disabled>
+              Move to contact (Charge)
+            </button>
+            <button id="attack-button" class="primary" disabled>
+              Resolve attack & end activation
+            </button>
+            <div
+              id="combat-report"
+              class="combat-report"
+              aria-live="polite"
+            ></div>
+          </section>
+          <section class="panel dice-panel">
+            <div class="panel-heading">
+              <h2>Dice tray</h2>
+              <span class="small-label">D6</span>
+            </div>
+            <div class="dice-choices">
+              <label for="dice-count">Dice</label
+              ><select id="dice-count" aria-label="Number of dice">
+                <option>1</option>
+                <option>2</option>
+                <option selected>3</option>
+                <option>4</option>
+                <option>5</option>
+                <option>6</option></select
+              ><button class="secondary" id="roll-button">
+                Roll dice
+                <svg viewBox="0 0 24 24" class="ui-icon" aria-hidden="true">
+                  <path d="M4 20L20 4M12 4h8v8M6 14l4 4M10 10l4 4" />
+                </svg>
+              </button>
+            </div>
+            <div id="dice-results" class="dice-results" aria-live="polite">
+              <span class="die placeholder">·</span
+              ><span class="die placeholder">·</span
+              ><span class="die placeholder">·</span>
+            </div>
+            <p class="muted">
+              Roll here. Apply hits, wounds and special rules at the table.
+            </p>
+          </section>
+          <section class="panel log-panel">
+            <div class="panel-heading">
+              <h2>Battle log</h2>
+              <button class="text-button" id="undo-button" disabled>
+                ← Undo
+              </button>
+            </div>
+            <ol id="battle-log" aria-label="Recent battle events"></ol>
+          </section>
+        </aside>
+      </div>
+      <footer>
+        <span class="footer-brand"
+          ><svg
+            viewBox="0 0 24 24"
+            class="ui-icon flag-icon"
+            aria-hidden="true"
+          >
+            <path d="M5 21V3h14l-5 5 5 5H5" />
+          </svg>
+          WAR TABLE</span
+        ><span>Built for stories, not spreadsheets.</span
+        ><span
+          >AoFS v3.6.0 companion
+          <span class="caption-separator">·</span> Unofficial prototype</span
+        >
+      </footer>
+    </main>
+    <div id="toast" role="status" aria-live="polite"></div>
+    <dialog id="guide">
+      <div class="dialog-heading">
+        <span class="eyebrow">WAR TABLE / FIELD NOTES</span
+        ><button id="close-guide" class="icon-button" aria-label="Close guide">
+          ×
+        </button>
+      </div>
+      <div id="guide-content"></div>
+    </dialog>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
