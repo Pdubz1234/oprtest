@@ -7,6 +7,6 @@
     "dev": "node scripts/serve.mjs",
     "build": "node scripts/build.mjs",
     "test": "node --test",
-    "check": "node --check public/app.js && node --check public/game.js"
+    "check": "node --check public/app.js && node --check public/game.js && node --check public/camera.js"
   }
 }

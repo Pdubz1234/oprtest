@@ -9,7 +9,17 @@ import {
   roundComplete,
   nextRound,
   score,
+  canActivate as rulesCanActivate,
+  movementBudget,
+  unitRanges,
+  weaponProfile,
 } from "./game.js";
+import {
+  defaultCamera,
+  viewToWorld,
+  zoomCamera,
+  cameraTransform,
+} from "./camera.js";
 const $ = (id) => document.getElementById(id);
 const TEAMS = ["Azure Covenant", "Ember Clans"];
 const SHORT = ["Azure", "Ember"];
@@ -32,6 +42,10 @@ let game = createGame(),
   measuring = false,
   measurePoints = [],
   timer;
+let camera = defaultCamera(),
+  panning = false,
+  drag = null,
+  suppressClick = false;
 try {
   const saved = JSON.parse(localStorage.getItem(STORAGE));
   if (
@@ -77,8 +91,7 @@ function toast(text) {
   timer = setTimeout(() => $("toast").classList.remove("visible"), 4300);
 }
 const unit = () => game.units.find((u) => u.id === selected);
-const canActivate = (u) =>
-  u && !game.ended && u.team === game.player && !u.activated && !u.removed;
+const canActivate = (u) => rulesCanActivate(game, u);
 const esc = (text) =>
   String(text).replace(
     /[&<>"']/g,
@@ -152,7 +165,8 @@ function figure(kind) {
   );
 }
 function drawBoard() {
-  const u = unit();
+  const u = unit(),
+    ranges = unitRanges(game, u, action, spent, difficultUsed);
   let art = `<defs><radialGradient id="ground"><stop stop-color="#a4b28a"/><stop offset=".7" stop-color="#92a77b"/><stop offset="1" stop-color="#788f65"/></radialGradient><pattern id="grid" width="120" height="120" patternUnits="userSpaceOnUse"><path d="M120 0H0V120" fill="none" stroke="#e1e9cd" stroke-width="1" opacity=".24"/></pattern><filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".45" numOctaves="3" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="linear" slope=".1"/></feComponentTransfer><feBlend in="SourceGraphic" mode="multiply"/></filter><filter id="shadow"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#263c30" flood-opacity=".45"/></filter></defs><rect width="960" height="960" fill="url(#ground)"/><g opacity=".7"><path d="M-60 820Q240 730 407 485T1020 110" fill="none" stroke="#b7b991" stroke-width="87"/><path d="M-60 820Q240 730 407 485T1020 110" fill="none" stroke="#c0bf98" stroke-width="54" opacity=".5"/></g><rect width="960" height="960" fill="#9eab84" filter="url(#grain)" opacity=".25"/>`;
   for (let i = 0; i < 110; i++) {
     const x = (Math.sin(i * 43.13) * 0.5 + 0.5) * 960,
@@ -170,12 +184,10 @@ function drawBoard() {
     const c = obj.owner === null ? "#e6db9b" : COLORS[obj.owner];
     art += `<g transform="translate(${obj.x * 20} ${obj.y * 20})"><title>Objective ${obj.id}: ${obj.owner === null ? "neutral" : SHORT[obj.owner]}</title><circle r="60" fill="${c}" fill-opacity=".05" stroke="${c}" stroke-width="1" stroke-opacity=".5" stroke-dasharray="5 7"/><rect x="-14" y="-14" width="28" height="28" rx="3" transform="rotate(45)" fill="#526143" stroke="${c}" stroke-width="2"/><text text-anchor="middle" y="5" fill="${c}" font-size="14" font-family="Georgia">${obj.id}</text></g>`;
   }
-  if (canActivate(u) && !u.shaken && !measuring) {
-    const remaining = Math.max(
-      0,
-      (difficultUsed ? Math.min(6, ACTIONS[action]) : ACTIONS[action]) - spent,
-    );
-    art += `<circle cx="${u.x * 20}" cy="${u.y * 20}" r="${remaining * 20}" fill="#dae8b4" fill-opacity=".07" stroke="#e0ecc4" stroke-opacity=".65" stroke-width="1.5" stroke-dasharray="6 7" pointer-events="none"/>`;
+  if (ranges && !measuring) {
+    if (ranges.movement > 0)
+      art += `<circle class="movement-range" cx="${u.x * 20}" cy="${u.y * 20}" r="${ranges.movement * 20}" fill="#c8efbd" fill-opacity=".12" stroke="#def8c7" stroke-width="2" stroke-dasharray="6 7" pointer-events="none"/>`;
+    art += `<circle class="weapon-range" cx="${u.x * 20}" cy="${u.y * 20}" r="${ranges.weaponRadius * 20}" fill="none" stroke="#ffd393" stroke-opacity="${ranges.weaponAvailable ? 0.95 : 0.4}" stroke-width="2.5" stroke-dasharray="12 6" pointer-events="none"/>`;
   }
   if (measurePoints.length) {
     const a = measurePoints[0];
@@ -188,9 +200,11 @@ function drawBoard() {
   for (const m of game.units.filter((m) => !m.removed)) {
     const isSelected = m.id === selected,
       r = BASE * 10;
-    art += `<g class="miniature" data-unit="${m.id}" role="button" tabindex="0" aria-label="${esc(SHORT[m.team] + " " + m.name + (m.activated ? ", activated" : "") + (m.shaken ? ", shaken" : ""))}" transform="translate(${m.x * 20} ${m.y * 20})" style="color:${m.team ? "#ffe0c0" : "#d8f0ef"};opacity:${m.activated ? 0.6 : 1}"><title>${esc(SHORT[m.team] + " " + m.name)} · 32 mm base</title>${isSelected ? `<circle r="${r + 6}" fill="none" stroke="#f3ebc3" stroke-width="2"/><path d="M-4-25L0-20L4-25" fill="#f3ebc3"/>` : ""}<circle class="base" r="${r}" fill="${m.team ? "#785345" : "#3d6375"}" stroke="${COLORS[m.team]}" stroke-width="2" filter="url(#shadow)"/>${figure(m.kind)}${m.shaken ? '<text x="12" y="-11" fill="#ffe0a1" font-weight="bold" font-size="17">!</text>' : ""}${m.activated ? '<text x="12" y="-11" fill="#eaf2d5" font-size="16">✓</text>' : ""}</g>`;
+    art += `<g class="miniature" data-unit="${m.id}" role="button" tabindex="0" aria-label="${esc(SHORT[m.team] + " " + m.name + (m.activated ? ", activated" : "") + (m.shaken ? ", shaken" : ""))}" transform="translate(${m.x * 20} ${m.y * 20})" style="color:${m.team ? "#ffe0c0" : "#d8f0ef"};opacity:${m.activated ? 0.6 : 1}"><title>${esc(SHORT[m.team] + " " + m.name)} · 32 mm base</title>${ranges?.targets.includes(m.id) ? `<circle class="range-target" r="${r + 10}" fill="none" stroke="#ffd393" stroke-width="3"><title>Within weapon distance; resolve line of sight and combat manually</title></circle>` : ""}${isSelected ? `<circle r="${r + 6}" fill="none" stroke="#f3ebc3" stroke-width="2"/><path d="M-4-25L0-20L4-25" fill="#f3ebc3"/>` : ""}<circle class="base" r="${r}" fill="${m.team ? "#785345" : "#3d6375"}" stroke="${COLORS[m.team]}" stroke-width="2" filter="url(#shadow)"/>${figure(m.kind)}${m.shaken ? '<text x="12" y="-11" fill="#ffe0a1" font-weight="bold" font-size="17">!</text>' : ""}${m.activated ? '<text x="12" y="-11" fill="#eaf2d5" font-size="16">✓</text>' : ""}</g>`;
   }
-  $("board").innerHTML = art;
+  $("board").innerHTML =
+    `<g id="camera"><clipPath id="battlefield-clip"><rect width="960" height="960"/></clipPath><g clip-path="url(#battlefield-clip)">${art}</g></g>`;
+  updateCamera();
   $("board").classList.toggle("measure-mode", measuring);
 }
 function render() {
@@ -241,11 +255,19 @@ function render() {
         `<button class="action-button ${action === a ? "active" : ""}" data-action="${a}" aria-pressed="${action === a}" ${!available || u?.shaken || spent > 0 ? "disabled" : ""}>${details[a][0]}<span class="distance">${ACTIONS[a]}″</span><strong>${details[a][1]}</strong><small>${details[a][2]}</small></button>`,
     )
     .join("");
-  const limit = difficultUsed ? Math.min(6, ACTIONS[action]) : ACTIONS[action];
+  const { limit } = movementBudget(action, spent, difficultUsed);
   $("movement-used").textContent =
     `${spent.toFixed(spent % 1 ? 1 : 0)}″ / ${limit}″`;
   $("movement-fill").style.width =
     `${limit ? Math.min(100, (spent / limit) * 100) : 0}%`;
+  const ranges = unitRanges(game, u, action, spent, difficultUsed);
+  $("range-readout").textContent = ranges
+    ? `Movement upper bound: ${ranges.movement.toFixed(1)}″ remaining · ${ranges.weapon.name}: ${ranges.weapon.range || "base contact"}${ranges.weapon.range ? "″" : ""}${ranges.weaponAvailable ? "" : " (unavailable for this activation/action)"}. ${ranges.targets.length} distance-qualified targets for this action. Distance only; check line of sight and resolve combat manually.`
+    : "Select a unit to see movement and weapon ranges.";
+  $("weapon-range-input").disabled =
+    !u || u.removed || u.kind !== "bow" || game.ended;
+  $("weapon-range-input").value =
+    u?.kind === "bow" ? weaponProfile(u).range : "";
   $("action-help").textContent = u?.shaken
     ? "Recovery: end this activation without moving to clear Shaken."
     : action === "charge"
@@ -281,13 +303,16 @@ function moveTo(target) {
     toast("Select a miniature first.");
     return;
   }
-  const result = moveResult(game, selected, target, action, spent);
+  const result = moveResult(
+    game,
+    selected,
+    target,
+    action,
+    spent,
+    difficultUsed,
+  );
   if (result.error) {
     toast(result.error);
-    return;
-  }
-  if (difficultUsed && spent + result.length > 6 + 0.001) {
-    toast("Difficult terrain limits this activation to 6″ total.");
     return;
   }
   if (result.length < 0.01) return;
@@ -301,11 +326,116 @@ function moveTo(target) {
   );
   render();
 }
+function updateCamera() {
+  $("camera")?.setAttribute("transform", cameraTransform(camera));
+  $("view-status").textContent =
+    `${Math.round(camera.zoom * 100)}% · ${camera.angle}°`;
+  $("zoom-in").disabled = camera.zoom >= 4;
+  $("zoom-out").disabled = camera.zoom <= 0.5;
+  // Fixed frame axes are misleading after moving the camera.
+  $("board")
+    .closest(".board-frame")
+    .classList.toggle(
+      "camera-moved",
+      camera.zoom !== 1 ||
+        camera.angle !== 0 ||
+        camera.x !== 0 ||
+        camera.y !== 0,
+    );
+}
+function boardPoint(event) {
+  return new DOMPoint(event.clientX, event.clientY).matrixTransform(
+    $("board").getScreenCTM().inverse(),
+  );
+}
+$("zoom-in").onclick = () => {
+  camera = zoomCamera(camera, 1.25);
+  updateCamera();
+};
+$("zoom-out").onclick = () => {
+  camera = zoomCamera(camera, 0.8);
+  updateCamera();
+};
+for (const [id, angle] of [
+  ["rotate-left", -45],
+  ["rotate-right", 45],
+])
+  $(id).onclick = () => {
+    camera.angle = (camera.angle + angle + 360) % 360;
+    updateCamera();
+  };
+$("reset-view").onclick = () => {
+  camera = defaultCamera();
+  updateCamera();
+};
+$("pan-button").onclick = () => {
+  panning = !panning;
+  $("pan-button").setAttribute("aria-pressed", panning);
+  $("pan-button").classList.toggle("active", panning);
+  $("board").classList.toggle("pan-mode", panning);
+};
+$("board").addEventListener(
+  "wheel",
+  (event) => {
+    event.preventDefault();
+    camera = zoomCamera(
+      camera,
+      Math.exp(-Math.max(-100, Math.min(100, event.deltaY)) * 0.003),
+      boardPoint(event),
+    );
+    updateCamera();
+  },
+  { passive: false },
+);
+$("board").addEventListener("pointerdown", (event) => {
+  if (!panning || event.button !== 0 || drag) return;
+  suppressClick = false;
+  drag = {
+    pointer: event.pointerId,
+    start: boardPoint(event),
+    x: camera.x,
+    y: camera.y,
+  };
+  $("board").setPointerCapture(event.pointerId);
+});
+$("board").addEventListener("pointermove", (event) => {
+  if (!drag || drag.pointer !== event.pointerId) return;
+  const point = boardPoint(event);
+  camera.x = drag.x + point.x - drag.start.x;
+  camera.y = drag.y + point.y - drag.start.y;
+  suppressClick = true;
+  updateCamera();
+});
+for (const name of ["pointerup", "pointercancel", "lostpointercapture"])
+  $("board").addEventListener(name, (event) => {
+    if (drag?.pointer !== event.pointerId) return;
+    drag = null;
+    if ($("board").hasPointerCapture(event.pointerId))
+      $("board").releasePointerCapture(event.pointerId);
+  });
+$("weapon-range-input").onchange = () => {
+  const u = unit(),
+    value = Number($("weapon-range-input").value);
+  if (!u || u.kind !== "bow" || u.removed || game.ended) return;
+  if (!Number.isFinite(value) || value < 1 || value > 48) {
+    toast("Set a demo weapon range between 1″ and 48″.");
+    $("weapon-range-input").value = weaponProfile(u).range;
+    return;
+  }
+  snapshot();
+  u.weaponRange = value;
+  log(`${SHORT[u.team]} ${u.name} weapon range set to ${value}″.`);
+  render();
+};
 $("rosters").addEventListener("click", (event) => {
   const b = event.target.closest("[data-unit]");
   if (b) choose(b.dataset.unit);
 });
 $("board").addEventListener("click", (event) => {
+  if (panning || suppressClick) {
+    suppressClick = false;
+    return;
+  }
   if (!measuring) {
     const m = event.target.closest("[data-unit]");
     if (m) {
@@ -317,7 +447,9 @@ $("board").addEventListener("click", (event) => {
     pt = new DOMPoint(event.clientX, event.clientY).matrixTransform(
       svg.getScreenCTM().inverse(),
     );
-  const p = { x: pt.x / 20, y: pt.y / 20 };
+  const world = viewToWorld(pt, camera);
+  if (world.x < 0 || world.x > 960 || world.y < 0 || world.y > 960) return;
+  const p = { x: world.x / 20, y: world.y / 20 };
   if (measuring) {
     if (measurePoints.length === 2) measurePoints = [];
     measurePoints.push(p);
@@ -347,7 +479,12 @@ $("board").addEventListener("keydown", (event) => {
   if (delta && unit()) {
     event.preventDefault();
     const u = unit();
-    moveTo({ x: u.x + delta[0], y: u.y + delta[1] });
+    const origin = viewToWorld({ x: 480, y: 480 }, camera);
+    const step = viewToWorld(
+      { x: 480 + delta[0] * camera.zoom, y: 480 + delta[1] * camera.zoom },
+      camera,
+    );
+    moveTo({ x: u.x + step.x - origin.x, y: u.y + step.y - origin.y });
     document.querySelector(`#board [data-unit="${selected}"]`)?.focus();
   }
 });
@@ -480,7 +617,7 @@ $("guide").addEventListener("click", (e) => {
 });
 $("help-button").onclick = () =>
   openGuide(
-    `<h2>Your table, ready to play.</h2><ol><li>Azure starts. Select one of its miniatures in the roster or on the board.</li><li>Choose Hold, Advance, Rush or Charge, then click a destination. You may make several shorter moves within the action’s total range. On keyboard, focus a board miniature, press Enter to select, then use arrow keys for 1″ steps.</li><li>Resolve attacks and special rules manually using your army lists and the dice tray. Mark Shaken or remove casualties with the activation panel.</li><li>End activation, then pass the device to the other player. When all miniatures have activated, advance the round.</li><li>After four rounds, the side controlling the most objectives wins.</li></ol><p>Grid squares are 6″. Use Zones to view the 12″ deployment areas, or Measure to check center-to-center distances. Undo reverses board changes; New battle clears the board. Progress saves in this browser only—there is no online multiplayer.</p><h3>Prototype boundaries</h3><p>Each demo miniature is treated as its own unit. These are illustrative rosters, not official or points-balanced army lists. Deployment is pre-set. Line of sight, cover bonuses, combat, wounds, morale tests, special rules and final charge base contact are manual. Ruins and rocks are treated as impassable sight blockers; woodland and brush count as cover and difficult terrain. This is a tabletop companion, not a complete rules engine.</p>`,
+    `<h2>Your table, ready to play.</h2><ol><li>Azure starts. Select one of its miniatures in the roster or on the board.</li><li>Choose Hold, Advance, Rush or Charge, then click a destination. You may make several shorter moves within the action’s total range. On keyboard, focus a board miniature, press Enter to select, then use arrow keys for 1″ steps.</li><li>Resolve attacks and special rules manually using your army lists and the dice tray. Mark Shaken or remove casualties with the activation panel.</li><li>End activation, then pass the device to the other player. When all miniatures have activated, advance the round.</li><li>After four rounds, the side controlling the most objectives wins.</li></ol><p>Grid squares are 6″. Use Zones to view the 12″ deployment areas, or Measure to check center-to-center distances. Undo reverses board changes; New battle clears the board. Progress saves in this browser only—there is no online multiplayer.</p><h3>Camera and ranges</h3><p>Use +/− or the mouse wheel to zoom, rotate in 45° steps, and enable Pan to drag the view with mouse or touch. Reset view fits the whole board. Arrow keys move in the screen direction after rotation. Green is remaining movement (an upper bound, not a legal-path guarantee); amber is weapon distance to target centers, including both 32 mm bases. Amber target rings check distance only, not line of sight. Bows default to a demo 24″ range editable in the activation panel; melee requires base contact. Rush/Charge disable shooting; Shaken and unavailable units cannot attack. Attacks remain manual.</p><h3>Prototype boundaries</h3><p>Each demo miniature is treated as its own unit. These are illustrative rosters, not official or points-balanced army lists. Deployment is pre-set. Line of sight, cover bonuses, combat, wounds, morale tests, special rules and final charge base contact are manual. Ruins and rocks are treated as impassable sight blockers; woodland and brush count as cover and difficult terrain. This is a tabletop companion, not a complete rules engine.</p>`,
   );
 $("rules-button").onclick = () =>
   openGuide(

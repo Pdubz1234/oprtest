@@ -1240,3 +1240,68 @@ dialog .secondary {
   align-items: center;
   gap: 6px;
 }
+
+/* View tools remain visible on touch screens; camera never alters game coordinates. */
+.camera-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 10px;
+}
+.camera-controls .tool {
+  min-height: 34px;
+  border-color: #ccd5bf;
+  color: #4e6545;
+  font-size: 11px;
+}
+.camera-controls output {
+  min-width: 78px;
+  text-align: center;
+  font-size: 11px;
+  color: #4e6545;
+}
+#board.pan-mode,
+#board.pan-mode .miniature {
+  cursor: grab;
+  touch-action: none;
+}
+#board.pan-mode:active {
+  cursor: grabbing;
+}
+.camera-moved .axis-top,
+.camera-moved .axis-side,
+.camera-moved .board-corner {
+  visibility: hidden;
+}
+.range-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 10px;
+  color: #536a49;
+  margin: 10px 0 0;
+}
+.range-legend span:last-child {
+  color: #8a5c20;
+}
+.range-settings {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 11px;
+}
+.range-settings input {
+  width: 58px;
+  padding: 5px;
+  border: 1px solid #ccd5bf;
+  border-radius: 4px;
+  background: #fffef7;
+  color: #3e5138;
+}
+.range-readout {
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 10px 0;
+}

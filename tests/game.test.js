@@ -11,6 +11,9 @@ import {
   roundComplete,
   nextRound,
   score,
+  unitRanges,
+  weaponProfile,
+  movementBudget,
 } from "../public/game.js";
 test("48 inch setup has twelve 32 mm single-model units and 20 terrain pieces", () => {
   const g = createGame();
@@ -164,4 +167,69 @@ test("shaken and removed miniatures cannot seize or contest", () => {
   g.units.forEach((u) => (u.activated = true));
   nextRound(g);
   assert.equal(g.objectives[0].owner, null);
+});
+
+test("range engine shares action and difficult-terrain movement budgets", () => {
+  const g = createGame(),
+    u = g.units[0];
+  assert.equal(unitRanges(g, u, "advance", 2).movement, 4);
+  assert.equal(unitRanges(g, u, "rush", 2, true).movement, 4);
+  assert.equal(unitRanges(g, u, "hold").movement, 0);
+  assert.equal(unitRanges(g, u, "charge").movement, 12);
+  assert.equal(movementBudget("toString").remaining, 0);
+  assert.ok(moveResult(g, u.id, { x: 6, y: 8 }, "toString").error);
+  assert.match(
+    moveResult(g, u.id, { x: 1, y: 8 }, "rush", 1, true).error,
+    /6″/,
+  );
+});
+test("weapon distance is measured base-edge to base-edge with inclusive boundary", () => {
+  const g = createGame(),
+    bow = g.units[3],
+    enemy = g.units[6];
+  enemy.x = bow.x + 24 + BASE;
+  enemy.y = bow.y;
+  assert.equal(weaponProfile(bow).range, 24);
+  assert.ok(unitRanges(g, bow, "advance").targets.includes(enemy.id));
+  enemy.x += 0.01;
+  assert.ok(!unitRanges(g, bow, "advance").targets.includes(enemy.id));
+  bow.weaponRange = 36;
+  assert.ok(unitRanges(g, bow, "hold").targets.includes(enemy.id));
+  enemy.removed = true;
+  assert.ok(!unitRanges(g, bow, "hold").targets.includes(enemy.id));
+  bow.weaponRange = -1;
+  assert.equal(weaponProfile(bow).range, 24);
+});
+test("shooting requires Hold or Advance and an available unshaken bow unit", () => {
+  const g = createGame(),
+    bow = g.units[3];
+  for (const action of ["rush", "charge", "invalid"])
+    assert.equal(unitRanges(g, bow, action).weaponAvailable, false);
+  assert.equal(unitRanges(g, bow, "hold").weaponAvailable, true);
+  for (const key of ["shaken", "activated"]) {
+    bow[key] = true;
+    const ranges = unitRanges(g, bow, "advance");
+    assert.equal(ranges.movement, 0);
+    assert.equal(ranges.weaponAvailable, false);
+    bow[key] = false;
+  }
+  g.player = 1;
+  assert.equal(unitRanges(g, bow, "advance").weaponAvailable, false);
+  g.player = 0;
+  g.ended = true;
+  assert.equal(unitRanges(g, bow, "hold").weaponAvailable, false);
+  bow.removed = true;
+  assert.equal(unitRanges(g, bow, "hold"), null);
+});
+test("melee range requires base contact, with attack eligibility on Charge only", () => {
+  const g = createGame(),
+    u = g.units[0],
+    enemy = g.units[6];
+  enemy.x = u.x + BASE;
+  enemy.y = u.y;
+  assert.ok(unitRanges(g, u, "charge").targets.includes(enemy.id));
+  assert.equal(unitRanges(g, u, "advance").weaponAvailable, false);
+  assert.equal(unitRanges(g, u, "charge").weapon.range, 0);
+  enemy.x += 0.01;
+  assert.ok(!unitRanges(g, u, "charge").targets.includes(enemy.id));
 });

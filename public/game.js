@@ -2,6 +2,61 @@ export const SIZE = 48;
 export const BASE = 32 / 25.4;
 export const ACTIONS = { hold: 0, advance: 6, rush: 12, charge: 12 };
 export const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+// Demo profiles, not official army data. Distances are in battlefield inches.
+export function weaponProfile(unit) {
+  const ranged = unit.kind === "bow";
+  return {
+    name: ranged ? "Demo bow" : "Melee",
+    ranged,
+    range: ranged
+      ? Number.isFinite(unit.weaponRange) &&
+        unit.weaponRange >= 1 &&
+        unit.weaponRange <= 48
+        ? unit.weaponRange
+        : 24
+      : 0,
+  };
+}
+export const canActivate = (game, unit) =>
+  Boolean(
+    unit &&
+      !game.ended &&
+      unit.team === game.player &&
+      !unit.activated &&
+      !unit.removed,
+  );
+export function movementBudget(action, spent = 0, difficult = false) {
+  const maximum = Object.hasOwn(ACTIONS, action) ? ACTIONS[action] : 0;
+  const limit = difficult ? Math.min(6, maximum) : maximum;
+  return { limit, remaining: Math.max(0, limit - spent) };
+}
+export function unitRanges(game, unit, action, spent = 0, difficult = false) {
+  if (!unit || unit.removed) return null;
+  const weapon = weaponProfile(unit);
+  const ready = canActivate(game, unit) && !unit.shaken;
+  const weaponAvailable =
+    ready &&
+    (weapon.ranged
+      ? ["hold", "advance"].includes(action)
+      : action === "charge");
+  return {
+    movement: ready ? movementBudget(action, spent, difficult).remaining : 0,
+    weapon,
+    weaponAvailable,
+    // Both bases are 32 mm: this circle marks eligible target CENTERS.
+    weaponRadius: weapon.range + BASE,
+    targets: weaponAvailable
+      ? game.units
+          .filter(
+            (target) =>
+              !target.removed &&
+              target.team !== unit.team &&
+              distance(unit, target) <= weapon.range + BASE + 0.001,
+          )
+          .map((target) => target.id)
+      : [],
+  };
+}
 export function terrain(seed = 1) {
   const pieces = [];
   for (let row = 0; row < 5; row++)
@@ -58,7 +113,14 @@ export function createGame(seed = 1) {
 const inside = (p, t, margin = 0) =>
   Math.abs(p.x - t.x) <= t.w / 2 + margin &&
   Math.abs(p.y - t.y) <= t.h / 2 + margin;
-export function moveResult(game, id, target, action, spent = 0) {
+export function moveResult(
+  game,
+  id,
+  target,
+  action,
+  spent = 0,
+  difficultUsed = false,
+) {
   const unit = game.units.find((u) => u.id === id);
   if (
     !unit ||
@@ -70,7 +132,7 @@ export function moveResult(game, id, target, action, spent = 0) {
     return { error: "Select an available miniature from the active warband." };
   if (unit.shaken)
     return { error: "Shaken miniatures must recover without moving." };
-  if (!(action in ACTIONS)) return { error: "Choose an action." };
+  if (!Object.hasOwn(ACTIONS, action)) return { error: "Choose an action." };
   if (
     !Number.isFinite(target.x) ||
     !Number.isFinite(target.y) ||
@@ -97,7 +159,7 @@ export function moveResult(game, id, target, action, spent = 0) {
         difficult = true;
     }
   }
-  const limit = difficult ? Math.min(6, ACTIONS[action]) : ACTIONS[action];
+  const { limit } = movementBudget(action, 0, difficult || difficultUsed);
   if (length + spent > limit + 0.001)
     return {
       error: `${difficult ? "Difficult terrain: " : ""}${limit}″ total movement limit. Undo to choose another path.`,
